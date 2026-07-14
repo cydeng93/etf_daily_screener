@@ -2,9 +2,20 @@ name: Daily ETF screen
 
 on:
   workflow_dispatch:
+    inputs:
+      test_discord:
+        description: "Send a Discord test message even if no criteria are met"
+        required: false
+        type: boolean
+        default: false
+
   schedule:
-    - cron: "0 9 * * 1-5"
-      timezone: "America/New_York"
+    # GitHub cron uses UTC.
+    # 13:00 UTC is 9:00 AM Eastern during daylight saving time.
+    # 14:00 UTC is 9:00 AM Eastern during standard time.
+    # The Python script ignores the incorrect one automatically.
+    - cron: "0 13 * * 1-5"
+    - cron: "0 14 * * 1-5"
 
 permissions:
   contents: read
@@ -32,4 +43,6 @@ jobs:
       - name: Run ETF screener
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          TEST_DISCORD: ${{ inputs.test_discord || 'false' }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python etf_screener.py
