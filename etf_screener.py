@@ -184,11 +184,8 @@ def main() -> int:
     print("\nToday's screening")
     print(pd.DataFrame(rows).to_string(index=False))
 
-    if any(r.criteria_count > 0 for r in results):
-        notify_discord(results)
-        print("\nDiscord notification sent.")
-    else:
-        print("\nNo criteria met; no Discord notification sent.")
+    notify_discord(results)
+print("\nDiscord test notification sent.")
     return 0
 
 
