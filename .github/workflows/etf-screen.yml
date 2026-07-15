@@ -1,4 +1,4 @@
-name: Daily ETF screen
+name: ETF screen every two hours
 
 on:
   workflow_dispatch:
@@ -10,12 +10,10 @@ on:
         default: false
 
   schedule:
-    # GitHub cron uses UTC.
-    # 13:00 UTC is 9:00 AM Eastern during daylight saving time.
-    # 14:00 UTC is 9:00 AM Eastern during standard time.
-    # The Python script ignores the incorrect one automatically.
-    - cron: "0 13 * * 1-5"
-    - cron: "0 14 * * 1-5"
+    # Run every two hours, Monday through Friday.
+    # GitHub scheduled cron runs in UTC, but the exact local hour
+    # no longer matters because the screener runs throughout the day.
+    - cron: "0 */2 * * 1-5"
 
 permissions:
   contents: read
@@ -44,5 +42,4 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           TEST_DISCORD: ${{ inputs.test_discord || 'false' }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python etf_screener.py
