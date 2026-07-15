@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Daily ETF technical screener.
+ETF technical screener.
 
 ETFs screened:
 - VTI
@@ -15,7 +15,7 @@ Criteria:
 2. Daily RSI(14) is below 35.
 3. Latest closing price is at or below the 200-day simple moving average.
 
-Discord:
+Discord behavior:
 - Scheduled runs send a message only when at least one criterion is met.
 - Manual test runs can force a Discord message using TEST_DISCORD=true.
 """
@@ -90,36 +90,13 @@ class ScreeningResult:
 
     @property
     def price_vs_sma_text(self) -> str:
-        """Create beginner-friendly text describing price vs. SMA(200)."""
+        """Create readable text describing price versus SMA(200)."""
         if math.isclose(self.vs_sma_pct, 0.0, abs_tol=0.05):
             return "About at SMA(200)"
 
         direction = "above" if self.vs_sma_pct > 0 else "below"
 
         return f"About {abs(self.vs_sma_pct):.1f}% {direction}"
-
-
-# ------------------------------------------------------------
-# TIME CHECK
-# ------------------------------------------------------------
-
-def should_run_now() -> bool:
-    """
-    Scheduled workflows are triggered at both 13:00 UTC and 14:00 UTC.
-
-    This protects against daylight-saving-time changes by allowing the
-    script to continue only when it is actually around 9:00 AM Eastern.
-
-    Manual workflow runs are always allowed.
-    """
-    event_name = os.getenv("GITHUB_EVENT_NAME", "").strip().lower()
-
-    if event_name != "schedule":
-        return True
-
-    now_eastern = datetime.now(EASTERN_TIME)
-
-    return now_eastern.hour == 9
 
 
 # ------------------------------------------------------------
@@ -133,7 +110,7 @@ def calculate_rsi_wilder(
     """
     Calculate RSI using Wilder's smoothing method.
 
-    This is the standard method commonly used for RSI(14).
+    This is the standard daily RSI method used by many charting platforms.
     """
     price_changes = closing_prices.diff()
 
@@ -156,7 +133,7 @@ def calculate_rsi_wilder(
 
     rsi = 100 - (100 / (1 + relative_strength))
 
-    # Handle unusual cases with uninterrupted gains or losses.
+    # Handle unusual cases involving uninterrupted gains or losses.
     rsi = rsi.where(average_loss != 0, 100.0)
     rsi = rsi.where(average_gain != 0, 0.0)
 
@@ -171,10 +148,10 @@ def download_history(ticker: str) -> pd.DataFrame:
     """
     Download two years of daily price history from Yahoo Finance.
 
-    Two years provides enough information for:
+    Two years provides enough data for:
     - SMA(200)
     - RSI(14)
-    - Trailing 52-week high
+    - trailing 52-week high
     """
     last_error: Exception | None = None
 
@@ -233,10 +210,12 @@ def download_history(ticker: str) -> pd.DataFrame:
 
             if attempt < DOWNLOAD_ATTEMPTS:
                 delay = DOWNLOAD_RETRY_DELAY_SECONDS * attempt
+
                 print(
                     f"{ticker} download attempt {attempt} failed. "
                     f"Retrying in {delay} seconds..."
                 )
+
                 time.sleep(delay)
 
     raise RuntimeError(
@@ -435,13 +414,9 @@ def send_discord_message(
     )
 
     if test_mode:
-        heading = (
-            "🧪 **Discord webhook test — ETF screener**"
-        )
+        heading = "🧪 **Discord webhook test — ETF screener**"
     else:
-        heading = (
-            "📊 **ETF buying-opportunity alert**"
-        )
+        heading = "📊 **ETF buying-opportunity alert**"
 
     if triggered_results:
         trigger_lines = "\n".join(
@@ -469,7 +444,7 @@ def send_discord_message(
         "Technical signals do not guarantee future returns._"
     )
 
-    # Discord limits a normal webhook message to 2,000 characters.
+    # Discord limits a standard webhook message to 2,000 characters.
     if len(message) > 1990:
         message = message[:1987] + "..."
 
@@ -498,13 +473,6 @@ def main() -> int:
         f"Current Eastern time: "
         f"{now_eastern:%Y-%m-%d %I:%M:%S %p %Z}"
     )
-
-    if not should_run_now():
-        print(
-            "This scheduled run is not the 9:00 AM Eastern run. "
-            "Exiting without screening."
-        )
-        return 0
 
     test_discord = (
         os.getenv("TEST_DISCORD", "false")
