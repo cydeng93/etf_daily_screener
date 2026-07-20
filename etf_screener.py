@@ -16,7 +16,7 @@ Criteria:
 3. Latest closing price is at or below the 200-day simple moving average.
 
 Discord behavior:
-- Scheduled runs send a message only when at least one criterion is met.
+- Scheduled runs send a message only when at least two of the three criteria are met.
 - Manual test runs can force a Discord message using TEST_DISCORD=true.
 """
 
@@ -43,6 +43,7 @@ TICKERS = ("VTI", "VOO", "VEA", "VWO", "IWM")
 
 DRAWDOWN_TRIGGER_PCT = 5.0
 RSI_TRIGGER = 35.0
+MIN_CRITERIA_FOR_ALERT = 2
 
 RSI_PERIOD = 14
 SMA_PERIOD = 200
@@ -405,7 +406,7 @@ def send_discord_message(
     triggered_results = [
         result
         for result in results
-        if result.criteria_count > 0
+        if result.criteria_count >= MIN_CRITERIA_FOR_ALERT
     ]
 
     latest_data_date = max(
@@ -428,7 +429,7 @@ def send_discord_message(
         )
     else:
         trigger_lines = (
-            "No ETF currently meets any criteria. "
+            "No ETF currently meets at least two of the three criteria. "
             "This message was sent because test mode was enabled."
         )
 
@@ -440,7 +441,8 @@ def send_discord_message(
         f"**Triggered criteria**\n"
         f"{trigger_lines}\n\n"
         "_Criteria: at least 5% below the 52-week high; "
-        "RSI(14) below 35; or closing price at or below SMA(200). "
+        "RSI(14) below 35; and closing price at or below SMA(200). "
+        "An alert is sent only when at least 2 of these 3 criteria are met. "
         "Technical signals do not guarantee future returns._"
     )
 
@@ -524,7 +526,7 @@ def main() -> int:
     )
 
     criteria_triggered = any(
-        result.criteria_count > 0
+        result.criteria_count >= MIN_CRITERIA_FOR_ALERT
         for result in results
     )
 
@@ -546,7 +548,7 @@ def main() -> int:
 
     else:
         print(
-            "\nNo criteria were met. "
+            "\nNo ETF met at least 2 of the 3 criteria. "
             "No Discord notification was sent."
         )
 
