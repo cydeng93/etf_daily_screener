@@ -18,7 +18,7 @@ Each ETF receives a score from `0/3` to `3/3`.
 
 ## Discord alerts
 
-The script sends a Discord message when at least one ETF meets at least one criterion.
+The script sends a Discord message when at least one ETF meets at least two criterion.
 
 If no ETF meets a criterion, no Discord message is sent.
 
