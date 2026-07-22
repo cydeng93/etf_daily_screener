@@ -1,34 +1,41 @@
-name: ETF screen every two hours
+name: ETF Screener
+
+permissions:
+  contents: write
 
 on:
+  # Allows you to run the screener manually from GitHub Actions.
   workflow_dispatch:
     inputs:
       test_discord:
-        description: "Send a Discord test message even if no criteria are met"
+        description: "Send a Discord message even if no criteria are met"
         required: false
-        type: boolean
         default: false
+        type: boolean
 
+  # Runs every two hours.
+  # GitHub Actions cron schedules use UTC.
   schedule:
-    # Run every two hours, Monday through Friday.
-    # GitHub scheduled cron runs in UTC, but the exact local hour
-    # no longer matters because the screener runs throughout the day.
-    - cron: "0 */2 * * 1-5"
+    - cron: "0 */2 * * *"
 
-permissions:
-  contents: read
+# Prevent two screening runs from updating the history file simultaneously.
+concurrency:
+  group: etf-screener
+  cancel-in-progress: false
 
 jobs:
   screen:
+    name: Screen ETFs
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
@@ -36,10 +43,31 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install pandas requests yfinance
 
       - name: Run ETF screener
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          TEST_DISCORD: ${{ inputs.test_discord || 'false' }}
-        run: python etf_screener.py
+          TEST_DISCORD: ${{ github.event_name == 'workflow_dispatch' && inputs.test_discord || false }}
+        run: |
+          python -u etf_screener.py
+
+      - name: Save screening history
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add data/etf_screening_history.csv
+
+          if git diff --cached --quiet; then
+            echo "No screening-history changes to save."
+            exit 0
+          fi
+
+          git commit -m "Update ETF screening history"
+
+          # Incorporate any repository changes made while this run was active.
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+
+          git push origin "HEAD:${GITHUB_REF_NAME}"
