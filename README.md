@@ -1,6 +1,6 @@
 # ETF Screener
 
-This project checks these ETFs every two hours on weekdays:
+This script checks:
 
 * VTI
 * VOO
@@ -8,83 +8,58 @@ This project checks these ETFs every two hours on weekdays:
 * VWO
 * IWM
 
-It looks for three possible buying signals:
+It runs every two hours through GitHub Actions.
 
-1. Price is at least 5% below the 52-week high
-2. RSI(14) is below 35
-3. Price is at or below the 200-day simple moving average
+A Discord alert is sent when an ETF meets at least one of these criteria:
 
-Each ETF receives a score from `0/3` to `3/3`.
-
-## Discord alerts
-
-The script sends a Discord message when at least one ETF meets at least two criterion.
-
-If no ETF meets a criterion, no Discord message is sent.
-
-The message includes:
-
-* Percentage below the 52-week high
-* RSI(14)
-* Price versus SMA(200)
-* Number of criteria met
-
-## Test Discord
-
-You can manually test the webhook even when no criteria are met.
-
-1. Open the repository on GitHub
-2. Click **Actions**
-3. Select **ETF screen every two hours**
-4. Click **Run workflow**
-5. Turn on **Send a Discord test message even if no criteria are met**
-6. Click **Run workflow**
-
-## Schedule
-
-The workflow runs every two hours from Monday through Friday.
-
-```yaml
-- cron: "0 */2 * * 1-5"
-```
-
-GitHub uses UTC for scheduled workflows.
+1. At least 5% below its 52-week high
+2. RSI(14) below 35
+3. Price at or below the 200-day moving average
 
 ## Files
 
 ```text
-.github/workflows/etf-screen.yml
 etf_screener.py
-requirements.txt
-README.md
+.github/workflows/etf_screener.yml
+data/etf_screening_history.csv
 ```
 
-## Required GitHub secret
+The history CSV is created after the first successful run.
 
-Your Discord webhook must be saved as:
+## View Past Results
+
+Open:
+
+```text
+data/etf_screening_history.csv
+```
+
+GitHub will show the CSV in a table-like view.
+
+## Discord Setup
+
+Add this GitHub Actions secret:
 
 ```text
 DISCORD_WEBHOOK
 ```
 
-Add it under:
-
-**Settings → Secrets and variables → Actions**
-
-## Requirements
+Go to:
 
 ```text
-pandas==2.3.1
-requests==2.32.4
-yfinance==0.2.65
+Settings → Secrets and variables → Actions
 ```
 
-## Notes
+## Run Manually
 
-The script uses Yahoo Finance data through `yfinance`.
+Go to:
 
-The full screening table appears in the GitHub Actions log for every run.
+```text
+Actions → ETF Screener → Run workflow
+```
 
-An ETF may trigger repeated Discord alerts every two hours if it continues meeting the criteria.
+You can enable test mode to send a Discord message even if no criteria are met.
 
-These indicators do not guarantee that an ETF is a good investment or that the price has reached its bottom.
+## Disclaimer
+
+For informational purposes only. This is not financial advice.
