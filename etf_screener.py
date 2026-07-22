@@ -16,8 +16,13 @@ Criteria:
 3. Latest closing price is at or below the 200-day simple moving average.
 
 Discord behavior:
-- Scheduled runs send a message only when at least two of the three criteria are met.
+- Scheduled runs send a message when at least one of the three criteria is met.
 - Manual test runs can force a Discord message using TEST_DISCORD=true.
+
+History behavior:
+- Every successful run is appended to data/etf_screening_history.csv.
+- In GitHub Actions, the workflow must commit that CSV back to the repository
+  so it persists after the runner finishes.
 """
 
 from __future__ import annotations
@@ -28,6 +33,7 @@ import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -43,7 +49,7 @@ TICKERS = ("VTI", "VOO", "VEA", "VWO", "IWM")
 
 DRAWDOWN_TRIGGER_PCT = 5.0
 RSI_TRIGGER = 35.0
-MIN_CRITERIA_FOR_ALERT = 2
+MIN_CRITERIA_FOR_ALERT = 1
 
 RSI_PERIOD = 14
 SMA_PERIOD = 200
@@ -54,6 +60,13 @@ DOWNLOAD_RETRY_DELAY_SECONDS = 8
 DISCORD_TIMEOUT_SECONDS = 20
 
 EASTERN_TIME = ZoneInfo("America/New_York")
+
+HISTORY_CSV_PATH = Path(
+    os.getenv(
+        "HISTORY_CSV_PATH",
+        "data/etf_screening_history.csv",
+    )
+)
 
 
 # ------------------------------------------------------------
@@ -385,6 +398,105 @@ def create_trigger_description(
 
 
 # ------------------------------------------------------------
+# PERSISTENT HISTORY
+# ------------------------------------------------------------
+
+def append_results_to_history(
+    results: list[ScreeningResult],
+    run_time_eastern: datetime,
+) -> Path:
+    """
+    Append one row per ETF to a persistent CSV history file.
+
+    The CSV survives locally automatically. In GitHub Actions, the workflow
+    must commit the changed CSV back to the repository after this script runs.
+    """
+    HISTORY_CSV_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    run_timestamp = run_time_eastern.isoformat(
+        timespec="seconds"
+    )
+
+    rows = []
+
+    for result in results:
+        rows.append(
+            {
+                "run_time_eastern": run_timestamp,
+                "market_data_date": result.as_of,
+                "ETF": result.ticker,
+                "close": round(result.close, 4),
+                "high_52w": round(result.high_52w, 4),
+                "below_52w_high_pct": round(
+                    result.below_high_pct,
+                    4,
+                ),
+                "RSI_14": round(result.rsi_14, 4),
+                "SMA_200": round(result.sma_200, 4),
+                "price_vs_SMA_200_pct": round(
+                    result.vs_sma_pct,
+                    4,
+                ),
+                "drawdown_criterion_met": (
+                    result.drawdown_met
+                ),
+                "RSI_criterion_met": result.rsi_met,
+                "SMA_criterion_met": result.sma_met,
+                "criteria_met_count": (
+                    result.criteria_count
+                ),
+                "notification_threshold_met": (
+                    result.criteria_count
+                    >= MIN_CRITERIA_FOR_ALERT
+                ),
+            }
+        )
+
+    new_rows = pd.DataFrame(rows)
+
+    if HISTORY_CSV_PATH.exists():
+        existing = pd.read_csv(HISTORY_CSV_PATH)
+
+        combined = pd.concat(
+            [existing, new_rows],
+            ignore_index=True,
+        )
+    else:
+        combined = new_rows
+
+    # Protect against accidental duplicate writes of the same run.
+    combined = combined.drop_duplicates(
+        subset=[
+            "run_time_eastern",
+            "market_data_date",
+            "ETF",
+        ],
+        keep="last",
+    )
+
+    combined = combined.sort_values(
+        by=[
+            "run_time_eastern",
+            "ETF",
+        ],
+        ascending=[
+            True,
+            True,
+        ],
+    )
+
+    combined.to_csv(
+        HISTORY_CSV_PATH,
+        index=False,
+    )
+
+    return HISTORY_CSV_PATH
+
+
+# ------------------------------------------------------------
 # DISCORD
 # ------------------------------------------------------------
 
@@ -429,7 +541,7 @@ def send_discord_message(
         )
     else:
         trigger_lines = (
-            "No ETF currently meets at least two of the three criteria. "
+            "No ETF currently meets at least one of the three criteria. "
             "This message was sent because test mode was enabled."
         )
 
@@ -442,7 +554,7 @@ def send_discord_message(
         f"{trigger_lines}\n\n"
         "_Criteria: at least 5% below the 52-week high; "
         "RSI(14) below 35; and closing price at or below SMA(200). "
-        "An alert is sent only when at least 2 of these 3 criteria are met. "
+        "An alert is sent when at least 1 of these 3 criteria is met. "
         "Technical signals do not guarantee future returns._"
     )
 
@@ -525,6 +637,15 @@ def main() -> int:
         )
     )
 
+    history_path = append_results_to_history(
+        results=results,
+        run_time_eastern=now_eastern,
+    )
+
+    print(
+        f"\nSaved this run to history: {history_path}"
+    )
+
     criteria_triggered = any(
         result.criteria_count >= MIN_CRITERIA_FOR_ALERT
         for result in results
@@ -548,7 +669,7 @@ def main() -> int:
 
     else:
         print(
-            "\nNo ETF met at least 2 of the 3 criteria. "
+            "\nNo ETF met any of the 3 criteria. "
             "No Discord notification was sent."
         )
 
