@@ -1,0 +1,6 @@
+run_time_eastern,market_data_date,ETF,close,high_52w,below_52w_high_pct,RSI_14,SMA_200,price_vs_SMA_200_pct,drawdown_criterion_met,RSI_criterion_met,SMA_criterion_met,criteria_met_count,notification_threshold_met
+2026-07-22T11:08:21-04:00,2026-07-22,IWM,294.31,302.72,2.7781,50.5151,264.2062,11.3941,False,False,False,0,False
+2026-07-22T11:08:21-04:00,2026-07-22,VEA,70.635,73.23,3.5436,50.5684,66.0077,7.0102,False,False,False,0,False
+2026-07-22T11:08:21-04:00,2026-07-22,VOO,687.985,699.15,1.5969,52.4539,641.7357,7.2069,False,False,False,0,False
+2026-07-22T11:08:21-04:00,2026-07-22,VTI,369.465,374.7,1.3971,52.1571,344.0728,7.3799,False,False,False,0,False
+2026-07-22T11:08:21-04:00,2026-07-22,VWO,58.865,61.52,4.3157,48.5372,56.5691,4.0586,False,False,False,0,False
